@@ -13,123 +13,137 @@
 - [Motivation & Background](#motivation--background)
 - [Future Improvements](#future-improvements)
 - [Installation](#installation)
+- [Training Your Own Model](#training-your-own-model)
+- [License](#license)
 - [Sources](#sources)
-
-
-
 
 
 ## Overview
 
-This personal project is a computer vision-based food health checker that classifies everyday food items (e.g. eggs, chocolate, bread, pizza, apples) and evaluates whether they are healthy or unhealthy. In addition to classification, it also displays key nutritional information per 100 grams, including calories, protein, carbohydrates, and fat. 
+This personal project is a computer vision-based food health checker that detects everyday food items (eggs, chocolate, bread, pizza and apples) through a webcam and evaluates whether they are healthy, neutral or unhealthy. It also displays key nutritional information per 100 grams, including calories, fat, carbohydrates and protein, laid out like a printed Nutrition Facts label.
 
-This project integrates text-to-speech (TTS) functionality so that whenever a new food item is detected, the system not only displays its nutritional details but also reads them aloud in real-time. For example, the tool will announce: “Detected: Apple. Health status: Healthy. Calories per 100 grams: 61. Fat: 0.15 grams. Carbohydrates: 14.8 grams. Protein: 0.13 grams.” This ensures users can receive instant auditory feedback while keeping their focus on the food item or camera feed, which can potentially help visually impaired individuals. 
+The program uses a YOLO object detection model that I trained on my own food photos. Unlike a basic image classifier, which can only say what is in the picture, YOLO also finds where each food is. This lets the program draw a box around the food in the live camera feed and detect several foods at once.
 
-By using a pre-trained teachable machine ([https://teachablemachine.withgoogle.com/train/image](url)) and live webcam input, the program analyzes the food item in real-time and delivers both visual and auditory feedback on the classification result, health assessment, and macros. This project demonstrates how AI can support health-conscious decision-making and raise awareness about everyday food choices.
+This project also integrates text-to-speech (TTS) so that whenever a new food item is detected, the system reads its nutritional details aloud in real time. For example, the tool will announce: “Apples. Health status: Healthy. Calories per 100 grams: 61 kilocalories. Fat: 0.15 grams. Carbohydrates: 14.8 grams. Protein: 0.13 grams.” This lets users get instant audio feedback while keeping their focus on the food item or camera feed, which could potentially help visually impaired individuals.
+
+This project demonstrates how AI can support health-conscious decision-making and raise awareness about everyday food choices.
+
+> **Project history:** The first version of this project used an image classification model trained with [Google Teachable Machine](https://teachablemachine.withgoogle.com/train/image) and TensorFlow. The current version replaces it with a YOLO object detection model trained on the same photos, and adds a full app window.
 
 
 ## Demo / Example Output
 
-Detected: Eggs
+When an apple is held up to the camera, a green box with the tag `Apples 91%` appears around it, and the nutrition label next to the camera feed shows:
 
-Health Status: Healthy
+```text
+Nutrition Facts
+Apples
+Serving size 100g
 
+Calories                     61
+                  % Daily Value*
+Total fat 0.15g               0%
+Total carbohydrate 14.8g      5%
+Protein 0.13g                 0%
 
-Per 100g
-- Calories: 155 cal
-- Fat: 11.0
-- Carbs: 1.1
-- Protein: 13.0
-
+Health rating            Healthy
+Confidence                   91%
+```
 
 
 ## Features
 
+- Live food detection using the webcam and a YOLO object detection model
 
-- Live food item detection using the webcam and computer vision
-  
-- Classifies between: Eggs, Chocolate, Bread, Pizza, and Apples (More can be added)
-  
-- Provides a simplified health classification of Healthy, Neutral, or Unhealthy
+- Detects Eggs, Chocolate, Bread, Pizza and Apples (more can be added by retraining)
 
-  
-- Displays macronutrient breakdown per 100g:
-  
+- Draws a box around each detected food, colour-coded by health rating, and can detect several foods at once
+
+- Provides a simplified health rating of Healthy, Neutral or Unhealthy
+
+- Displays a Nutrition Facts-style label with values per 100g:
+
       - Calories
       - Fat (g)
       - Carbohydrates (g)
       - Protein (g)
+      - % Daily Value for fat, carbohydrates and protein (based on a 2,000 calorie diet)
 
-- Built using deep learning, OpenCV, and TensorFlow for real-time classification
-  
-- New food or potentially drink items can be added or retrained using Teachable Machine
+- Shows a confidence score for each detection
+
+- Reads the nutritional information aloud when a new food is detected
+
+- **Mute voice** button, which stops speech immediately, even mid-sentence
+
+- **Save snapshot** button, which saves a picture of the whole app window to a `screenshots` folder
 
 
-
-## How it Works
+## How It Works
 
 ### Model Loading
-- A keras .h5 model is loaded
+- The trained YOLO model (`best.pt`) is loaded with Ultralytics
+- If `best.pt` is missing, the program falls back to the ready-made `yolo11n.pt` model, which only knows apples and pizza from the food list
 
-### Label Processing
-- labels.txt provides class indices and food labels (e.g. "Eggs", "Pizza")
-- Each food is mapped to a health classification and nutritional data via a Pandas DataFrame
-
-### Nutrition Data 
+### Nutrition Data
+- Each food is mapped to a health rating and nutritional data through a Pandas DataFrame
 - A lookup table includes:
 
       - Food Name
+      - Health Status: Healthy, Neutral or Unhealthy
       - Calories per 100g
       - Fat (g) per 100g
       - Carbs (g) per 100g
-      - Protein (g) per 100 g
-      - Health Status: Healthy or Unhealthy
+      - Protein (g) per 100g
 
-### Live Classification 
-- Captures webcam frames
-- Runs predictions through the model
-- Display classifications results
+### Live Detection
+- A background thread captures webcam frames and runs them through the YOLO model, so the window stays smooth while detection runs
+- Detections below 50% confidence are ignored
+- If the model briefly loses a food for a few frames, the last result stays on screen so the display doesn't flicker
+- The most confident food is shown on the nutrition label, and each food gets a box on the camera feed
+
+### Text-to-Speech
+- When the main detected food changes, its nutrition is read aloud using the Windows speech engine
+- Speech runs on its own thread so the camera feed keeps running while it talks
 
 
 ## Tech Stack
 
+- Python 3.11: Main programming language
 
-- Python 3.11: Main programming language 
+- Ultralytics YOLO11: Object detection model training and inference
 
-  
-- TensorFlow 2.15.1 / Keras 2.15.0 — Deep learning model inference
+- PyTorch: Deep learning framework used by YOLO
 
+- Roboflow: Labelling the training photos with bounding boxes
 
-- Google Teachable Machine — Image classification model training
+- Google Colab: Training the model on a free cloud GPU
 
+- OpenCV: Real-time webcam capture and image processing
 
-- OpenCV: Real-time webcam capture and computer vision 
+- CustomTkinter: The app window
 
-  
+- Pillow: Drawing text on the camera feed, the logo and snapshots
+
 - NumPy: Image and numerical processing
 
-  
-- Pandas: Food categorization and nutritional data management 
+- Pandas: Food categorization and nutritional data management
 
-  
-- h5py: Keras `.h5` model file handling
+- pywin32 (Windows SAPI): Offline text-to-speech that can be stopped mid-sentence
 
+- Threading & Queue: Running detection and speech in the background so the window stays responsive
 
-- pyttsx3: Offline text-to-speech for classification and nutritional feedback
+- Barlow and Barlow Condensed fonts: The typefaces used in the app
 
-
-- Threading & Queue: Non-blocking text-to-speech so the webcam feed continues running while speech is processed
 
 ## Project Structure
 
 ```text
-computer-vision-food-recognition-and-nutritional-analysis-system/
+computer-vision-food-health-checker/
 │
-├── foodhealthchecker.py
+├── foodhealthchecker.py   # the program
+├── best.pt                # trained YOLO model
+├── fonts/                 # Barlow font files and their licence (OFL.txt)
 ├── requirements.txt
-├── converted_keras_food/
-│   ├── keras_model.h5
-│   └── labels.txt
 └── README.md
 ```
 
@@ -146,51 +160,49 @@ The system maps each recognized food item to nutritional information per 100 gra
 | Pizza | Unhealthy | 266 | 10.0 | 33.0 | 11.0 |
 | Apples | Healthy | 61 | 0.15 | 14.8 | 0.13 |
 
-> **Note:** Nutritional values are approximate and are expressed per 100 grams. Values can vary depending on the specific product, recipe, or preparation method.
+> **Note:** Nutritional values are approximate and are expressed per 100 grams. Values can vary depending on the specific product, recipe, or preparation method. % Daily Values use the FDA reference amounts of 78g fat, 275g carbohydrates and 50g protein.
 
 
 ## Motivation & Background
 
+Obesity, poor diet, and diet-related diseases are growing public health challenges in Canada and the United States. According to Statistics Canada, in Canada, about 30% of adults are estimated to have obesity as of 2022, a rise over the past decades (9% in 1981 to 27.2% in 2018, and now 30%).
 
-Obesity, poor diet, and diet-related diseases are growing public health challenges in Canada and the United States. According to Statistics Canada, in Canada, about 30% of adults are estimated to have obesity as of 2022, a rise over the past decades (9% in 1981 to 27.2% in 2018, and now 30%)
+After the COVID-19 pandemic, obesity rates in Canada continued to accelerate: from 25% in 2009 to 30% in 2022, an increase of about 8 percentage points, with it gaining each year.
 
-After the COVID-19 pandemic, obesity rates in Canada continued to accelerate: from 25% in 2009 to 30% in 2022, an increase of about 8 percentage points, with it gaining each year. 
+These trends highlight the urgent need for better public awareness about food quality, daily calorie intake, and nutrition. Many people consume foods without fully understanding their nutrient composition, making it harder to make healthier choices in everyday life.
 
-These trends highlight the urgent need for better public awareness about food quality, daily calorie intake, and nutrition. Many people consume foods without fully understanding their nutrient composition, making it harder to make healthier choices in everyday life. 
-
-This project aims to address part of that gap by providing a real-time food identifier + nutrition insight tool. By recognizing common food items (e.g. eggs, chocolate, bread, pizza, apples) and showing their calories and macronutrients per 100g, this system could be a starting point, with more foods and drinks being expanded into the data set. This system could also help users
+This project aims to address part of that gap by providing a real-time food identifier + nutrition insight tool. By recognizing common food items (e.g. eggs, chocolate, bread, pizza, apples) and showing their calories and macronutrients per 100g, this system could be a starting point, with more foods and drinks being expanded into the data set. This system could also help users:
 - Become more aware of what they are eating
 - Quickly judge if the food is relatively healthy
 - Use the data to guide better diet decisions
 
 To sum it up, this project uses computer vision and machine learning for nutritional education, with the hope of contributing (small-scale) to better health awareness in our communities.
 
+
 ## Future Improvements
 
 - Expand the model to recognize more food and drink categories
-- Improve classification accuracy using a larger and more diverse dataset
-- Add confidence scores for each prediction
+- Improve detection accuracy using a larger and more diverse dataset
 - Store nutritional information in an external CSV or database
 - Estimate serving sizes instead of displaying only per-100g values
-- Add a graphical user interface
-- Explore accessibility improvements for visually impaired users
+- Keep a daily log of scanned foods and total calories
+- Support macOS and Linux for text-to-speech
+- Explore further accessibility improvements for visually impaired users
+
 
 ## Installation
 
 ### Requirements
 
 - **Python 3.11**
+- **Windows** (the text-to-speech and custom fonts use Windows features; on other systems the app runs without speech and in a default font)
 - Webcam
-- Teachable Machine Keras model (`keras_model.h5`)
-- Food classification labels (`labels.txt`)
-
-This project uses a Teachable Machine `.h5` model. **Python 3.11 with TensorFlow 2.15.1 and Keras 2.15.0** is recommended for compatibility with the exported model.
 
 ### 1. Clone the Repository
 
-```bash
-git clone https://github.com/aidenzhang-12/computer-vision-food-recognition-and-nutritional-analysis-system.git
-cd computer-vision-food-recognition-and-nutritional-analysis-system
+```powershell
+git clone https://github.com/aidenzhangg/computer-vision-food-health-checker.git
+cd computer-vision-food-health-checker
 ```
 
 ### 2. Create a Virtual Environment
@@ -229,6 +241,8 @@ Install all required dependencies:
 python -m pip install -r requirements.txt
 ```
 
+This installs Ultralytics, which also installs PyTorch and OpenCV, so it can take a few minutes.
+
 ### 4. Run the Program
 
 Make sure the virtual environment is activated:
@@ -245,13 +259,37 @@ python foodhealthchecker.py
 
 The program will:
 
-1. Load the trained Teachable Machine model
-2. Open the webcam
-3. Classify the detected food item
-4. Display its health status and nutritional information
+1. Load the trained YOLO model
+2. Open the webcam in the app window
+3. Detect food items and draw a box around each one
+4. Display the health rating and nutritional information on the nutrition label
 5. Read the nutritional information aloud using text-to-speech
 
-Press `Esc` while the webcam window is selected to close the program.
+### Controls
+
+- **Mute voice / Unmute voice:** turns the speech off and on
+- **Save snapshot:** saves a picture of the whole window to the `screenshots` folder
+- **Esc** or closing the window: quits the program
+
+
+## Training Your Own Model
+
+To add new foods or improve accuracy, the model can be retrained:
+
+1. Collect photos of each food, ideally 100 to 200 per food, with different backgrounds, lighting and angles.
+2. Upload them to [Roboflow](https://roboflow.com), draw a box around each food, and name each box with the food's name. Names must match the nutrition table in `foodhealthchecker.py`.
+3. Export the dataset in YOLO format.
+4. Train in [Google Colab](https://colab.research.google.com) with a GPU:
+
+   ```python
+   !pip install ultralytics
+   !unzip -q food.zip -d food_dataset
+   !yolo detect train data=food_dataset/data.yaml model=yolo11n.pt epochs=100 imgsz=640
+   ```
+
+5. Download `runs/detect/train/weights/best.pt` and replace the `best.pt` file in this project.
+
+For a new food, also add a row for it to the nutrition table in `foodhealthchecker.py`.
 
 
 ## License
@@ -261,10 +299,16 @@ Copyright © 2026. All rights reserved.
 This project is publicly available for portfolio and educational viewing purposes.
 
 No permission is granted to copy, modify, distribute, or reuse the source code.
+
+The Barlow fonts in the `fonts` folder are not covered by this notice. They are licensed under the SIL Open Font License; see `fonts/OFL.txt`.
+
+
 ## Sources
 
-Research for Motivations & Background: [https://www150.statcan.gc.ca/n1/pub/82-003-x/2025002/article/00002-eng.htm](url)
+Research for Motivation & Background: [Statistics Canada](https://www150.statcan.gc.ca/n1/pub/82-003-x/2025002/article/00002-eng.htm)
 
-Calories & Macros for each Food: [https://fdc.nal.usda.gov/](url)
+Calories & Macros for each Food: [USDA FoodData Central](https://fdc.nal.usda.gov/)
 
+Object detection: [Ultralytics YOLO](https://docs.ultralytics.com)
 
+Fonts: [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby, SIL Open Font License
