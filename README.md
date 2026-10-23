@@ -13,7 +13,6 @@
 - [Motivation & Background](#motivation--background)
 - [Future Improvements](#future-improvements)
 - [Installation](#installation)
-- [Training Your Own Model](#training-your-own-model)
 - [License](#license)
 - [Sources](#sources)
 
@@ -270,26 +269,6 @@ The program will:
 - **Mute voice / Unmute voice:** turns the speech off and on
 - **Save snapshot:** saves a picture of the whole window to the `screenshots` folder
 - **Esc** or closing the window: quits the program
-
-
-## Training Your Own Model
-
-To add new foods or improve accuracy, the model can be retrained:
-
-1. Collect photos of each food, ideally 100 to 200 per food, with different backgrounds, lighting and angles.
-2. Upload them to [Roboflow](https://roboflow.com), draw a box around each food, and name each box with the food's name. Names must match the nutrition table in `foodhealthchecker.py`.
-3. Export the dataset in YOLO format.
-4. Train in [Google Colab](https://colab.research.google.com) with a GPU:
-
-   ```python
-   !pip install ultralytics
-   !unzip -q food.zip -d food_dataset
-   !yolo detect train data=food_dataset/data.yaml model=yolo11n.pt epochs=100 imgsz=640
-   ```
-
-5. Download `runs/detect/train/weights/best.pt` and replace the `best.pt` file in this project.
-
-For a new food, also add a row for it to the nutrition table in `foodhealthchecker.py`.
 
 
 ## License
