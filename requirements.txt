@@ -1,0 +1,5 @@
+ultralytics
+customtkinter
+pandas
+pillow
+pywin32
