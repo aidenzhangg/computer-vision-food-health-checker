@@ -30,13 +30,13 @@ LOGO_PATH = os.path.join(BASE_DIR, "logo.png")             # optional: put your 
 SCREENSHOT_DIR = os.path.join(BASE_DIR, "screenshots")     # where "Save snapshot" puts images
 FONT_DIR = os.path.join(BASE_DIR, "fonts")                 # Barlow font files (free, OFL licence)
 
-# ---- Tuning ----
+# Tuning
 CONFIDENCE_THRESHOLD = 0.50  # YOLO detections below this are ignored
 HOLD_FRAMES = 8              # keep showing the last food for a few frames if YOLO briefly loses it
 FRAME_W, FRAME_H = 640, 480  # camera feed size
 PANEL_W = 330                # width of the nutrition label next to the camera
 
-# ---- Colours ----
+# Colours
 # The look is based on a printed Nutrition Facts label: black ink on white, on a pale sage background.
 PAPER = "#DCE3D2"      # window background
 LABEL = "#FFFFFF"      # nutrition label background
@@ -70,7 +70,7 @@ def hex_to_bgr(hex_color):
 MACRO_LABELS = {"Fat (g)": "Total fat", "Carbs (g)": "Total carbohydrate", "Protein (g)": "Protein"}
 DAILY_VALUES = {"Fat (g)": 78, "Carbs (g)": 275, "Protein (g)": 50}
 
-# ---- Voice ----
+#Voice 
 # Uses the Windows speech engine (SAPI) directly, so a sentence can be cut off part way through when the voice is muted.
 
 _speech_q = queue.Queue()
@@ -268,7 +268,7 @@ def speak_nutrition (class_name, info):
     _speech_q.put(text)
 
 
-# ---- Fonts ----
+# Fonts
 
 def load_app_fonts():
     # Make the Barlow fonts in the fonts folder usable by the window, without installing them on the computer.
@@ -399,12 +399,12 @@ class CameraWorker(threading.Thread):
             return self._frame_id, self._latest
 
 
-# ---- Logo ----
+# logo
 
 def make_logo(size=256):
     """
-    Load logo.png from the project folder if there is one,
-    otherwise draw a simple logo: a white apple with a green check mark on a black square.
+    -note to self can load logo.png from the project folder if there is one,
+    draw a  logo: a white apple with a green check mark on a black square.
     """
     if os.path.exists(LOGO_PATH):
         return Image.open(LOGO_PATH).convert("RGBA").resize((size, size), Image.LANCZOS)
@@ -453,7 +453,7 @@ def set_window_icon(window, logo):
         window.iconphoto(True, window._icon_photo)
 
 
-# ---- App window ----
+# window of app
 
 class FoodHealthApp(ctk.CTk):
     def __init__(self, camera):
