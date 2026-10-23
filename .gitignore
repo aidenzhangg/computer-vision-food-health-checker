@@ -1,0 +1,7 @@
+*
+!.gitignore
+!foodhealthchecker.py
+!best.pt
+!requirements.txt
+!fonts/
+!fonts/*

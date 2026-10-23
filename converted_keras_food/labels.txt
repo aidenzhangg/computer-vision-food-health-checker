@@ -1,5 +1,0 @@
-0 Eggs
-1 Chocolate
-2 Bread
-3 Pizza
-4 Apples
