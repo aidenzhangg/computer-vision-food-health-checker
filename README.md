@@ -1,157 +1,166 @@
-# Computer Vision Food Health/Nutritional Analysis System
+# Computer Vision Food Health Checker
 
+A Python desktop app that recognizes food through a webcam, draws detection boxes, and displays a health rating with reference nutrition information. A custom YOLO model identifies eggs, chocolate, bread, pizza, and apples. The app also reads nutrition information aloud and saves annotated camera snapshots.
 
-## Table of Contents
+Built with Ultralytics YOLO, OpenCV, CustomTkinter, and pyttsx3. Camera processing and speech run in background threads while the desktop window displays the latest detection result.
 
-- [Overview](#overview)
-- [Demo / Example Output](#demo--example-output)
+## Contents
+
 - [Features](#features)
-- [How It Works](#how-it-works)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Nutrition Data](#nutrition-data)
-- [Motivation & Background](#motivation--background)
-- [Future Improvements](#future-improvements)
 - [Installation](#installation)
+- [Using the app](#using-the-app)
+- [Detection pipeline](#detection-pipeline)
+- [Threading and display updates](#threading-and-display-updates)
+- [Configuration](#configuration)
+- [Nutrition data](#nutrition-data)
+- [Project structure](#project-structure)
+- [Technology](#technology)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+- [Project background](#project-background)
+- [Future improvements](#future-improvements)
 - [License](#license)
 - [Sources](#sources)
 
-
-## Overview
-
-This personal project is a computer vision-based food health checker that detects everyday food items (eggs, chocolate, bread, pizza and apples) through a webcam and evaluates whether they are healthy, neutral or unhealthy. It also displays key nutritional information per 100 grams, including calories, fat, carbohydrates and protein, laid out like a printed Nutrition Facts label.
-
-The program uses a YOLO object detection model that I trained on my own food photos. Unlike a basic image classifier, which can only say what is in the picture, YOLO also finds where each food is. This lets the program draw a box around the food in the live camera feed and detect several foods at once.
-
-This project also integrates text-to-speech (TTS) so that whenever a new food item is detected, the system reads its nutritional details aloud in real time. For example, the tool will announce: “Apples. Health status: Healthy. Calories per 100 grams: 61 kilocalories. Fat: 0.15 grams. Carbohydrates: 14.8 grams. Protein: 0.13 grams.” This lets users get instant audio feedback while keeping their focus on the food item or camera feed, which could potentially help visually impaired individuals.
-
-This project demonstrates how AI can support health-conscious decision-making and raise awareness about everyday food choices.
-
-> **Project history:** The first version of this project used an image classification model trained with [Google Teachable Machine](https://teachablemachine.withgoogle.com/train/image) and TensorFlow. The current version replaces it with a YOLO object detection model trained on the same photos, and adds a full app window.
-
-
-## Demo / Example Output
-
-When an apple is held up to the camera, a green box with the tag `Apples 91%` appears around it, and the nutrition label next to the camera feed shows:
-
-```text
-Nutrition Facts
-Apples
-Serving size 100g
-
-Calories                     61
-                  % Daily Value*
-Total fat 0.15g               0%
-Total carbohydrate 14.8g      5%
-Protein 0.13g                 0%
-
-Health rating            Healthy
-Confidence                   91%
-```
-
-
 ## Features
 
-- Live food detection using the webcam and a YOLO object detection model
+- Webcam detection with food names, confidence scores, and bounding boxes.
+- Multiple detections per frame; the most confident food supplies the side-panel information.
+- Colour-coded detection boxes for the predefined Healthy, Neutral, and Unhealthy ratings.
+- Energy and fat, carbohydrate, and protein values per 100 g.
+- Separate progress bars for recognition confidence and nutrient amounts.
+- Spoken nutrition information when the main detected food changes.
+- Voice mute controls and timestamped PNG snapshots.
+- Brief retention of previous detections when the model temporarily loses a food.
 
-- Detects Eggs, Chocolate, Bread, Pizza and Apples (more can be added by retraining)
+## Installation
 
-- Draws a box around each detected food, colour-coded by health rating, and can detect several foods at once
+### Requirements
 
-- Provides a simplified health rating of Healthy, Neutral or Unhealthy
+- Python 3.11, a working webcam, and a desktop environment capable of opening a Tk window.
+- Windows is the primary development environment. Audio requires an installed system speech engine and a working playback device.
+- Internet access for dependency installation and for the first fallback-model download if `best.pt` is absent.
 
-- Displays a Nutrition Facts-style label with values per 100g:
+### Set up on Windows
 
-      - Calories
-      - Fat (g)
-      - Carbohydrates (g)
-      - Protein (g)
-      - % Daily Value for fat, carbohydrates and protein (based on a 2,000 calorie diet)
+Run these commands individually in PowerShell:
 
-- Shows a confidence score for each detection
-
-- Reads the nutritional information aloud when a new food is detected
-
-- **Mute voice** button, which stops speech immediately, even mid-sentence
-
-- **Save snapshot** button, which saves a picture of the whole app window to a `screenshots` folder
-
-
-## How It Works
-
-### Model Loading
-- The trained YOLO model (`best.pt`) is loaded with Ultralytics
-- If `best.pt` is missing, the program falls back to the ready-made `yolo11n.pt` model, which only knows apples and pizza from the food list
-
-### Nutrition Data
-- Each food is mapped to a health rating and nutritional data through a Pandas DataFrame
-- A lookup table includes:
-
-      - Food Name
-      - Health Status: Healthy, Neutral or Unhealthy
-      - Calories per 100g
-      - Fat (g) per 100g
-      - Carbs (g) per 100g
-      - Protein (g) per 100g
-
-### Live Detection
-- A background thread captures webcam frames and runs them through the YOLO model, so the window stays smooth while detection runs
-- Detections below 50% confidence are ignored
-- If the model briefly loses a food for a few frames, the last result stays on screen so the display doesn't flicker
-- The most confident food is shown on the nutrition label, and each food gets a box on the camera feed
-
-### Text-to-Speech
-- When the main detected food changes, its nutrition is read aloud using the Windows speech engine
-- Speech runs on its own thread so the camera feed keeps running while it talks
-
-
-## Tech Stack
-
-- Python 3.11: Main programming language
-
-- Ultralytics YOLO11: Object detection model training and inference
-
-- PyTorch: Deep learning framework used by YOLO
-
-- Roboflow: Labelling the training photos with bounding boxes
-
-- Google Colab: Training the model on a free cloud GPU
-
-- OpenCV: Real-time webcam capture and image processing
-
-- CustomTkinter: The app window
-
-- Pillow: Drawing text on the camera feed, the logo and snapshots
-
-- NumPy: Image and numerical processing
-
-- Pandas: Food categorization and nutritional data management
-
-- pywin32 (Windows SAPI): Offline text-to-speech that can be stopped mid-sentence
-
-- Threading & Queue: Running detection and speech in the background so the window stays responsive
-
-- Barlow and Barlow Condensed fonts: The typefaces used in the app
-
-
-## Project Structure
-
-```text
-computer-vision-food-health-checker/
-│
-├── foodhealthchecker.py   # the program
-├── best.pt                # trained YOLO model
-├── fonts/                 # Barlow font files and their licence (OFL.txt)
-├── requirements.txt
-└── README.md
+```powershell
+git clone https://github.com/aidenzhangg/computer-vision-food-health-checker.git
+cd computer-vision-food-health-checker
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install pyttsx3
+.\.venv\Scripts\python.exe foodhealthchecker.py
 ```
 
+The current script imports `pyttsx3`, which is not listed in `requirements.txt`; the additional install command above is required. Ultralytics supplies dependencies including PyTorch, OpenCV (`cv2`), and NumPy. Installation can take several minutes.
 
-## Nutrition Data
+Keep `best.pt` beside `foodhealthchecker.py` to use the trained detector. No training notebooks or original training images are needed to run inference.
 
-The system maps each recognized food item to nutritional information per 100 grams. The current prototype includes the following foods:
+These commands call the environment's Python directly, so PowerShell environment activation is optional. For an existing local `.venv-yolo` environment, run:
 
-| Food | Health Status | Calories (kcal) | Fat (g) | Carbohydrates (g) | Protein (g) |
+```powershell
+.\.venv-yolo\Scripts\python.exe foodhealthchecker.py
+```
+
+### VS Code Run button
+
+Open **Python: Select Interpreter** from the command palette and select the Python executable inside your environment, such as `.venv\Scripts\python.exe` or `.venv-yolo\Scripts\python.exe`. Open `foodhealthchecker.py` and choose **Run Python File in Terminal**.
+
+## Using the app
+
+Hold a supported food in view of the webcam. The image is mirrored for display. Each detected food receives a box and confidence label; the side panel follows the detection with the highest confidence.
+
+For example, an apple detected at 91% confidence displays `Apples`, a Healthy rating, 61 calories per 100 g, 0.15 g fat, 14.8 g carbohydrates, and 0.13 g protein. The confidence is illustrative, not a measured accuracy result.
+
+| Control | Behaviour |
+|---|---|
+| Mute voice | Prevents new announcements and clears speech waiting in the queue. A sentence already playing may finish. |
+| Unmute voice | Enables announcements for subsequent changes in the main detected food. |
+| Save snapshot | Saves the latest annotated camera frame to `screenshots/food_YYYY-MM-DD_HH-MM-SS.png`. |
+| Esc / close window | Stops the camera worker, signals the speech worker, and closes the app. |
+
+Snapshots contain the camera image and detection overlays, not the surrounding app controls. The `screenshots` directory is created when the first image is saved.
+
+## Detection pipeline
+
+```text
+Webcam (OpenCV)
+    |
+    v
+Resize to 640 x 480 and mirror
+    |
+    v
+YOLO inference: supported classes, confidence >= 0.50
+    |
+    v
+Normalize food names and sort detections by confidence
+    |
+    +--> Retain previous detections during brief misses
+    |
+    +--> Nutrition lookup for the highest-confidence food
+    |        |
+    |        +--> Side panel
+    |        +--> Speech queue when the main food changes
+    |
+    v
+Draw boxes and labels --> Latest result --> CustomTkinter window
+```
+
+### Model selection and class filtering
+
+The script resolves model paths relative to its own directory. If `best.pt` exists, it loads that file through `YOLO()`. Otherwise it uses `yolo11n.pt`, preferring a copy in the project directory and downloading the fallback if necessary.
+
+`to_food_name()` normalizes model labels through `NAME_ALIASES`, such as `apple` to `Apples` and `egg` to `Eggs`. `FOOD_CLASS_IDS` limits inference to model classes that match the nutrition table. If no classes match, the script prints the model's class names and exits.
+
+The fallback model recognizes apples and pizza from this project's supported list. It does not replace the custom model for eggs, bread, or chocolate.
+
+### Detection results and persistence
+
+`detect_foods()` returns dictionaries containing `name`, `confidence`, and `box`, where the box is `(x1, y1, x2, y2)` in frame coordinates. Results are sorted by descending confidence.
+
+`process_frame()` retains the previous detection list during up to eight consecutive frames without a supported detection. After that, the panel returns to its waiting state. This is frame retention rather than object tracking: objects have no persistent IDs, and retained boxes are not updated during missed frames.
+
+The model identifies the food class. The health rating and nutrition values come from a separate lookup table; they are not predicted from the image.
+
+## Threading and display updates
+
+| Component | Responsibility |
+|---|---|
+| Main Tk thread | Builds widgets, handles controls, and displays new results. |
+| `CameraWorker` | Captures webcam frames and runs detection and annotation sequentially. |
+| `_tts_worker` | Consumes queued announcements and calls the speech engine. |
+
+The camera worker publishes a single latest result protected by `threading.Lock`, with a frame counter identifying updates. The GUI checks for new results using `after(15, ...)` and skips frames it has already displayed. It does not build a queue of every processed camera frame.
+
+The side panel also caches a key containing the food name, rounded confidence, and other-food count to avoid unnecessary widget updates. Before a new speech message is queued, pending messages are cleared so older announcements do not accumulate. This does not interrupt speech already playing.
+
+The 15 ms GUI polling interval is not an inference-time or FPS guarantee. Actual speed depends on the model, CPU/GPU, webcam, and other running applications. This repository does not currently report benchmark results or validation accuracy metrics.
+
+## Configuration
+
+Settings are constants in `foodhealthchecker.py`; there is no settings file or command-line configuration interface.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `CONFIDENCE_THRESHOLD` | `0.50` | Filters lower-confidence detections. Raising it can reduce weak guesses but may miss foods. |
+| `HOLD_FRAMES` | `8` | Number of consecutive missed frames for which previous detections remain visible. |
+| `FRAME_W`, `FRAME_H` | `640`, `480` | Frame dimensions used before inference and for display. These are not an explicit YOLO `imgsz` setting. |
+| `MACRO_BAR_MAX` | `50.0` | Grams per 100 g that fill a nutrient bar completely. |
+| `CUSTOM_MODEL_PATH` | `best.pt` beside the script | Preferred trained model. |
+| `PRETRAINED_MODEL` | `yolo11n.pt` | Fallback model. |
+| `LOGO_PATH` | `logo.png` beside the script | Optional custom logo; a built-in logo is drawn if absent. |
+| `SCREENSHOT_DIR` | `screenshots` beside the script | Destination for saved frames. |
+
+The camera index is set by `cv2.VideoCapture(0)` in `main()`. Change `0` to another index if the intended webcam is not the default device.
+
+## Nutrition data
+
+The following reference values are stored directly in the `food_categorization` Pandas DataFrame:
+
+| Food | Assigned rating | Energy (kcal / 100 g) | Fat (g) | Carbohydrates (g) | Protein (g) |
 |---|---|---:|---:|---:|---:|
 | Eggs | Healthy | 155 | 11.0 | 1.1 | 13.0 |
 | Chocolate | Unhealthy | 598 | 42.6 | 46.4 | 7.8 |
@@ -159,135 +168,90 @@ The system maps each recognized food item to nutritional information per 100 gra
 | Pizza | Unhealthy | 266 | 10.0 | 33.0 | 11.0 |
 | Apples | Healthy | 61 | 0.15 | 14.8 | 0.13 |
 
-> **Note:** Nutritional values are approximate and are expressed per 100 grams. Values can vary depending on the specific product, recipe, or preparation method. % Daily Values use the FDA reference amounts of 78g fat, 275g carbohydrates and 50g protein.
+Nutrient bar fill is calculated as `min(grams / 50.0, 1.0)`. These bars are not percentages of daily intake. Confidence bar fill uses the model's detection confidence directly.
 
+Values are approximate references for a fixed 100 g amount. The camera does not measure serving weight, ingredients, or preparation method. Ratings are manually assigned categories in this prototype, not individualized dietary assessments.
 
-## Motivation & Background
-
-Obesity, poor diet, and diet-related diseases are growing public health challenges in Canada and the United States. According to Statistics Canada, in Canada, about 30% of adults are estimated to have obesity as of 2022, a rise over the past decades (9% in 1981 to 27.2% in 2018, and now 30%).
-
-After the COVID-19 pandemic, obesity rates in Canada continued to accelerate: from 25% in 2009 to 30% in 2022, an increase of about 8 percentage points, with it gaining each year.
-
-These trends highlight the urgent need for better public awareness about food quality, daily calorie intake, and nutrition. Many people consume foods without fully understanding their nutrient composition, making it harder to make healthier choices in everyday life.
-
-This project aims to address part of that gap by providing a real-time food identifier + nutrition insight tool. By recognizing common food items (e.g. eggs, chocolate, bread, pizza, apples) and showing their calories and macronutrients per 100g, this system could be a starting point, with more foods and drinks being expanded into the data set. This system could also help users:
-- Become more aware of what they are eating
-- Quickly judge if the food is relatively healthy
-- Use the data to guide better diet decisions
-
-To sum it up, this project uses computer vision and machine learning for nutritional education, with the hope of contributing (small-scale) to better health awareness in our communities.
-
-
-## Future Improvements
-
-- Expand the model to recognize more food and drink categories
-- Improve detection accuracy using a larger and more diverse dataset
-- Store nutritional information in an external CSV or database
-- Estimate serving sizes instead of displaying only per-100g values
-- Keep a daily log of scanned foods and total calories
-- Support macOS and Linux for text-to-speech
-- Explore further accessibility improvements for visually impaired users
-
-
-## Installation
-
-### Requirements
-
-- **Python 3.11**
-- **Windows** (the text-to-speech and custom fonts use Windows features; on other systems the app runs without speech and in a default font)
-- Webcam
-
-### 1. Clone the Repository
-
-```powershell
-git clone https://github.com/aidenzhangg/computer-vision-food-health-checker.git
-cd computer-vision-food-health-checker
-```
-
-### 2. Create a Virtual Environment
-
-Create a Python 3.11 virtual environment:
-
-```powershell
-py -3.11 -m venv .venv
-```
-
-Activate the virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-When activated, the terminal should display:
+## Project structure
 
 ```text
-(.venv)
+computer-vision-food-health-checker/
+|-- foodhealthchecker.py   # Detection, nutrition table, speech, and desktop UI
+|-- best.pt                # Custom trained YOLO weights
+|-- fonts/                 # Barlow fonts and OFL.txt
+|-- requirements.txt       # Dependency list
+|-- README.md
+|-- logo.png               # Optional; user-supplied
+`-- screenshots/           # Created at runtime when saving an image
 ```
 
-> **Note:** The virtual environment only needs to be created once. However, it must be activated again whenever a new terminal is opened.
+The current window loads Barlow font files and uses Georgia for display headings. The older Teachable Machine implementation may be present in local development files, but it is not needed to run this app.
 
-### 3. Install Dependencies
+## Technology
 
-Upgrade `pip`:
+| Technology | Role |
+|---|---|
+| Python 3.11 | Application code |
+| Ultralytics YOLO / PyTorch | Model loading and object detection |
+| OpenCV | Camera capture, resizing, mirroring, overlays, and PNG output |
+| CustomTkinter | Desktop window and controls |
+| Pillow | Logo drawing and conversion of camera images for Tk |
+| NumPy | Image arrays and numerical operations |
+| Pandas | Nutrition lookup table |
+| pyttsx3 | Text-to-speech using an installed system speech engine |
+| `threading` / `queue` | Background inference, synchronization, and speech messages |
 
-```powershell
-python -m pip install --upgrade pip
-```
+The training workflow used food photos labelled with Roboflow and model training in Google Colab. The runtime loads the resulting weights; it does not retrain the model.
 
-Install all required dependencies:
+## Troubleshooting
 
-```powershell
-python -m pip install -r requirements.txt
-```
+| Symptom | What to check |
+|---|---|
+| `No module named customtkinter`, `cv2`, or `pyttsx3` | Install dependencies with the same environment's `python.exe` used to launch the app. Install `pyttsx3` separately as shown above. |
+| VS Code Run fails while the terminal command works | Select the project environment through **Python: Select Interpreter**. |
+| Webcam does not open | Close other camera apps, check Windows camera permissions, and try another `VideoCapture` index. |
+| Only apples and pizza are supported | Check that `best.pt` is beside the script and read the model-selection message in the terminal. |
+| No model classes match | Compare `model.names` with `NAME_ALIASES` and the nutrition table. |
+| Labels alternate between foods | Try clearer lighting, a less cluttered background, or a higher confidence threshold. Frame retention does not smooth conflicting class predictions. |
+| Voice is silent | Ensure voice is unmuted, verify the playback device and system speech engine, and check the terminal for `TTS error`. A food must change from the last announced class to trigger another announcement. |
+| UI is responsive but video updates slowly | Inference runs separately from the GUI; inspect hardware load and model size. No fixed FPS is promised. |
+| Snapshot says there is no camera image | Wait for the first processed frame before saving. |
 
-This installs Ultralytics, which also installs PyTorch and OpenCV, so it can take a few minutes.
+## Limitations
 
-### 4. Run the Program
+Recognition is limited to supported classes in the loaded model. Confidence scores are model outputs, not a measured overall accuracy percentage. Similar appearances, occlusion, lighting, and backgrounds can cause misclassification, and the main panel may switch when detections trade confidence rankings.
 
-Make sure the virtual environment is activated:
+All inference and nutrition lookup run locally. There is no web server, browser frontend, detection database, persistent tracking, or scan-history feature in the current app. Camera images are saved only when the snapshot control is used. The app requires a desktop session and has not been packaged as a standalone executable.
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+## Project background
 
-Then run:
+I built this project to explore how computer vision can recognize everyday foods and make basic food information easier to access through a visual panel and spoken feedback.
 
-```powershell
-python foodhealthchecker.py
-```
+The first version used Google Teachable Machine and TensorFlow for image classification. The current version uses YOLO object detection, allowing the app to locate foods and identify multiple items in one frame. Nutrition remains supporting information attached to each recognized class.
 
-The program will:
+## Future improvements
 
-1. Load the trained YOLO model
-2. Open the webcam in the app window
-3. Detect food items and draw a box around each one
-4. Display the health rating and nutritional information on the nutrition label
-5. Read the nutritional information aloud using text-to-speech
-
-### Controls
-
-- **Mute voice / Unmute voice:** turns the speech off and on
-- **Save snapshot:** saves a picture of the whole window to the `screenshots` folder
-- **Esc** or closing the window: quits the program
-
+- Expand the labelled dataset and supported food categories.
+- Evaluate class-level precision, recall, and confusion on a held-out dataset.
+- Stabilize changes in the main detected class across successive frames.
+- Improve speech reliability and immediate interruption when muted.
+- Move reference food data into a separate file with more specific source records.
+- Add camera selection and configurable thresholds in the window.
+- Package and test installation on a clean machine.
 
 ## License
 
-Copyright © 2026. All rights reserved.
+Copyright ? 2026. All rights reserved.
 
 This project is publicly available for portfolio and educational viewing purposes.
 
 No permission is granted to copy, modify, distribute, or reuse the source code.
 
-The Barlow fonts in the `fonts` folder are not covered by this notice. They are licensed under the SIL Open Font License; see `fonts/OFL.txt`.
-
+The Barlow fonts in the `fonts` folder are not covered by this notice. They are licensed under the SIL Open Font License; see `fonts/OFL.txt`. Third-party libraries retain their respective licenses.
 
 ## Sources
 
-Research for Motivation & Background: [Statistics Canada](https://www150.statcan.gc.ca/n1/pub/82-003-x/2025002/article/00002-eng.htm)
-
-Calories & Macros for each Food: [USDA FoodData Central](https://fdc.nal.usda.gov/)
-
-Object detection: [Ultralytics YOLO](https://docs.ultralytics.com)
-
-Fonts: [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby, SIL Open Font License
+- Nutrition reference: [USDA FoodData Central](https://fdc.nal.usda.gov/).
+- Object detection library: [Ultralytics documentation](https://docs.ultralytics.com/).
+- Original classification workflow: [Google Teachable Machine](https://teachablemachine.withgoogle.com/train/image).
+- Fonts: [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby; see the bundled font license.
