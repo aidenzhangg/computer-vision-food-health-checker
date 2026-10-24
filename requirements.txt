@@ -4,3 +4,4 @@ pandas
 pillow
 pywin32
 pyttsx3
+opencv-python
