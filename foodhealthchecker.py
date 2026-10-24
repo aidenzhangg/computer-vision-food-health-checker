@@ -83,6 +83,15 @@ def _tts_worker():
         import win32com.client
         pythoncom.CoInitialize()
         voice = win32com.client.Dispatch("SAPI.SpVoice")
+        voices = voice.GetVoices()
+        if voices.Count:
+            voice.Voice = voices.Item(0)
+        # Select the Windows playback device explicitly and use full speech volume.
+        outputs = voice.GetAudioOutputs()
+        if outputs.Count:
+            voice.AudioOutput = outputs.Item(0)
+        voice.Volume = 100
+        voice.Rate = 0
     except Exception as e:
         print("TTS error, voice is off:", e)
         return
@@ -101,6 +110,7 @@ def _tts_worker():
             voice.Speak(text, SPEAK_ASYNC)
             # Wait for the sentence to finish, checking every 50ms whether we've been told to stop
             while not voice.WaitUntilDone(50):
+                pythoncom.PumpWaitingMessages()
                 if _stop_speaking.is_set():
                     voice.Speak("", SPEAK_ASYNC | PURGE)  # cut off the current sentence
                     break
@@ -109,6 +119,7 @@ def _tts_worker():
         finally:
             _speech_q.task_done()
 
+    voice = None
     pythoncom.CoUninitialize()
 
 _tts_thread = threading.Thread(target=_tts_worker, daemon=True)
@@ -354,7 +365,8 @@ def process_frame(frame, state):
         info = get_nutrition_info(food_categorization, main["name"])
         print(f"Detected: {main['name']} ({main['confidence']:.0%})")
         speak_nutrition(main["name"], info)
-        state["last_spoken"] = main["name"]
+        if not muted:
+            state["last_spoken"] = main["name"]
 
     frame = draw_detections(frame, detections)
     return frame, main, (len(detections) - 1 if detections else 0)
@@ -527,8 +539,6 @@ class FoodHealthApp(ctk.CTk):
         self.header_logo = ctk.CTkImage(self.logo, size=(46, 46))
         ctk.CTkLabel(header, image=self.header_logo, text="").grid(row=0, column=0, rowspan=2, padx=(0, 14))
         self._text(header, "Food Health Checker", self.fonts["app_title"], height=32).grid(row=0, column=1, sticky="sw")
-        self._text(header, "Hold a food up to the camera to read its label", self.fonts["body"], INK_SOFT,
-                   height=20).grid(row=1, column=1, sticky="nw")
 
         self.status_label = ctk.CTkLabel(header, text="", font=self.fonts["button"])
         self.status_label.grid(row=0, column=2, rowspan=2, sticky="e")
@@ -547,7 +557,7 @@ class FoodHealthApp(ctk.CTk):
         self.video_label.pack(padx=4, pady=4)
 
         # Nutrition label
-        label = ctk.CTkFrame(body, width=PANEL_W, height=FRAME_H + 8, fg_color=LABEL,
+        label = ctk.CTkFrame(body, width=PANEL_W, height=FRAME_H + 48, fg_color=LABEL,
                              border_color=INK, border_width=3, corner_radius=0)
         label.grid(row=0, column=1, sticky="n", padx=(20, 0))
         label.pack_propagate(False)
@@ -575,18 +585,30 @@ class FoodHealthApp(ctk.CTk):
 
         # Fat, carbs and protein rows: name, grams, and % of the daily value
         self.macro_widgets = {}
+        self.macro_bars = {}
         for key in ["Fat (g)", "Carbs (g)", "Protein (g)"]:
             self._rule(inner, 1)
             row = ctk.CTkFrame(inner, fg_color="transparent")
             row.pack(fill="x", pady=2)
-            self._text(row, MACRO_LABELS[key], self.fonts["body_bold"], height=24).pack(side="left")
-            grams = self._text(row, "", self.fonts["body"], height=24)
-            grams.pack(side="left", padx=(6, 0))
-            daily = self._text(row, "", self.fonts["body_bold"], height=24)
-            daily.pack(side="right")
+            # Reserve the percentage column before laying out the nutrient text.
+            row.grid_columnconfigure(0, weight=1, minsize=0)
+            row.grid_columnconfigure(1, minsize=54)
+            row.grid_columnconfigure(2, minsize=48)
+            self._text(row, MACRO_LABELS[key], self.fonts["body_bold"],
+                       width=0, height=24).grid(row=0, column=0, sticky="w")
+            grams = self._text(row, "", self.fonts["body"], width=48, height=24)
+            grams.grid(row=0, column=1, sticky="e", padx=(6, 0))
+            daily = self._text(row, "", self.fonts["body_bold"], width=48, height=24)
+            daily.configure(anchor="e")
+            daily.grid(row=0, column=2, sticky="e")
             self.macro_widgets[key] = (grams, daily)
+            bar = ctk.CTkProgressBar(inner, height=5, corner_radius=0,
+                                     fg_color=TRACK, progress_color=INK)
+            bar.pack(fill="x", pady=(0, 5))
+            bar.set(0)
+            self.macro_bars[key] = bar
 
-        self._rule(inner, 10, pady=(2, 8))
+        ctk.CTkFrame(inner, height=8, fg_color="transparent").pack(fill="x")
 
         # Health rating and how sure the model is
         row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -597,7 +619,7 @@ class FoodHealthApp(ctk.CTk):
 
         row = ctk.CTkFrame(inner, fg_color="transparent")
         row.pack(fill="x", pady=(8, 0))
-        self._text(row, "Confidence", self.fonts["body"], height=20).pack(side="left")
+        self._text(row, "Confidence score", self.fonts["body"], height=20).pack(side="left")
         self.conf_value = self._text(row, "", self.fonts["body_bold"], height=20)
         self.conf_value.pack(side="right")
         self.conf_bar = ctk.CTkProgressBar(inner, height=8, corner_radius=0, border_width=0,
@@ -626,12 +648,13 @@ class FoodHealthApp(ctk.CTk):
         self.message_label = self._text(footer, "", self.fonts["body"], INK_SOFT)
         self.message_label.pack(side="left", padx=14)
 
-        self._text(footer, f"{MODEL_LABEL}. Press Esc to quit.", self.fonts["small"], INK_SOFT).pack(side="right")
+        self._text(footer, "Press Esc to quit.", self.fonts["small"], INK_SOFT).pack(side="right")
 
     def set_status(self, text, color):
         self.status_label.configure(text=f"●  {text}", text_color=color)
 
     def show_food(self, main, other_count):
+        self._current_food = main
         # Update the nutrition label (only when something changed, to keep the window fast)
         key = None if main is None else (main["name"], round(main["confidence"], 2), other_count)
         if key == self._panel_key:
@@ -647,6 +670,8 @@ class FoodHealthApp(ctk.CTk):
                 daily.configure(text="–")
             self.badge.configure(text="Waiting", fg_color=TRACK, text_color=INK_SOFT)
             self.conf_value.configure(text="–")
+            for bar in self.macro_bars.values():
+                bar.set(0)
             self.conf_bar.set(0)
             self.more_label.configure(text="")
             return
@@ -660,6 +685,7 @@ class FoodHealthApp(ctk.CTk):
         for key, (grams, daily) in self.macro_widgets.items():
             grams.configure(text=f"{info[key]}g")
             daily.configure(text=f"{round(info[key] / DAILY_VALUES[key] * 100)}%")
+            self.macro_bars[key].set(min(info[key] / DAILY_VALUES[key], 1.0))
         self.badge.configure(text=status, fg_color=HEALTH_HEX.get(status, HEALTH_HEX["Unknown"]),
                              text_color=HEALTH_TEXT.get(status, "#FFFFFF"))
         self.conf_value.configure(text=f"{main['confidence']:.0%}")
@@ -698,6 +724,9 @@ class FoodHealthApp(ctk.CTk):
         muted = not muted
         if muted:
             stop_speech()
+        elif getattr(self, "_current_food", None) is not None:
+            food = self._current_food["name"]
+            speak_nutrition(food, get_nutrition_info(food_categorization, food))
         self.mute_button.configure(text="Unmute voice" if muted else "Mute voice")
         self.flash_message("Voice muted" if muted else "Voice unmuted")
 
