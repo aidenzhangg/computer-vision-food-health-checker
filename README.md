@@ -241,7 +241,7 @@ The first version used Google Teachable Machine and TensorFlow for image classif
 
 ## License
 
-Copyright ? 2026. All rights reserved.
+Copyright © 2026. All rights reserved.
 
 This project is publicly available for portfolio and educational viewing purposes.
 
