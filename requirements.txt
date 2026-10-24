@@ -3,3 +3,4 @@ customtkinter
 pandas
 pillow
 pywin32
+pyttsx3
