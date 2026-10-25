@@ -5,6 +5,7 @@
 import os
 import sys
 import tempfile
+from time import perf_counter
 import threading, queue
 from datetime import datetime
 
@@ -393,16 +394,33 @@ class CameraWorker(threading.Thread):
         }
 
     def run(self):
+        fps_frames = 0
+        fps_seconds = 0.0
         try:
             while self.running:
+                frame_start = perf_counter()
                 ret, frame = self.camera.read()
                 if not ret:
                     self.error = "Lost connection to the webcam"
                     break
                 result = process_frame(frame, self._state)
+                # Includes capture, YOLO inference, nutrition lookup and box drawing.
+                frame_seconds = perf_counter() - frame_start
+                fps = 1.0 / frame_seconds if frame_seconds > 0 else 0.0
+                cv2.putText(result[0], f"FPS: {fps:.1f}", (12, 28),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 4, cv2.LINE_AA)
+                cv2.putText(result[0], f"FPS: {fps:.1f}", (12, 28),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
                 with self._lock:
                     self._latest = result
                     self._frame_id += 1
+                # Batch timing also includes the FPS overlay and result publication.
+                fps_seconds += perf_counter() - frame_start
+                fps_frames += 1
+                if fps_frames == 300:
+                    print(f"Average FPS over 300 processed frames: {fps_frames / fps_seconds:.2f}")
+                    fps_frames = 0
+                    fps_seconds = 0.0
         finally:
             self.camera.release()
 
