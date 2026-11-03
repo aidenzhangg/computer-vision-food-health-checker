@@ -1,18 +1,32 @@
 # Computer Vision Food Recognition and Nutritional Analysis System
 
-A Python desktop application that uses a custom YOLO11 model and OpenCV to recognize food in a live webcam feed. It draws bounding boxes, shows confidence scores, and connects each recognized food to a reference nutrition table and a predefined health rating.
+**Hold food up to a webcam, see what the model recognizes, and get its reference nutrition information without typing a search.**
 
-I trained the detector on my own food photos. It supports **eggs, chocolate, bread, pizza, and apples**. The interface includes spoken feedback, nutrient bars, a live FPS counter, and screenshots of the app window.
+## Why I built this
+
+I'm interested in nutrition, but keeping track of food is another task to fit around school and everything else. Apps like MyFitnessPal came to mind when I thought about food logging: searching for an item, choosing the right entry, and entering a portion. I wanted to explore whether a camera could make the food lookup step easier.
+
+What if I could just hold food up to a camera instead of typing its name? That question became the starting point for this project. My goal was to recognize a food and bring up its reference nutrition information straight away. I'm not trying to recreate all of MyFitnessPal; I wanted to build and understand this one part of the process.
+
+I started with a simple image classifier, then moved to YOLO11 so I could draw boxes around foods and detect more than one item at once. This project is my first version of that idea: scan a supported food, see the result, and hear its nutrition read aloud.
+
+There is still a gap between recognizing a food and logging a meal. The app currently shows reference values per 100 g; it does not know how much I am eating or keep a food diary. Making food easier to look up is the part I have built so far.
+
+## About
+
+This is a Python desktop app built with a custom YOLO11 model, OpenCV, and CustomTkinter. I trained the detector on my own food photos. It currently recognizes **eggs, chocolate, bread, pizza, and apples**.
+
+Each detection gets a bounding box and confidence score. The side panel shows nutrition per 100 g and a health rating from a lookup table. The app also includes spoken feedback, a live FPS counter, and a button to save the whole window as a screenshot. Detection runs locally on the computer.
 
 ## Screenshots
 
 ![Food Health Checker detecting an egg, with its bounding box, confidence score, live FPS, and nutrition panel](docs/images/food-health-checker.png)
 
-*Egg detection with spoken-feedback controls and a Nutrition Facts panel.*
+*Detecting an egg and showing its nutrition beside the camera feed.*
 
 ![Food Health Checker detecting bread on a plate, with a neutral rating and nutrient bars](docs/images/bread-detection.png)
 
-*Bread detection showing a different food class and health rating. The confidence scores and FPS in these screenshots are individual observations, not overall accuracy or benchmark results.*
+*Detecting bread on a plate. The FPS and confidence shown are from these frames; they are not an average speed or an overall accuracy score.*
 
 ## What it does
 
@@ -23,7 +37,7 @@ I trained the detector on my own food photos. It supports **eggs, chocolate, bre
 - Provides mute/unmute controls and saves a picture of the whole app window.
 - Displays current processing FPS and prints average throughput every 300 processed frames.
 
-The model predicts the food class and location. Nutrition values and Healthy, Neutral, or Unhealthy ratings are assigned through a lookup table; the camera does not measure them or estimate portion weight.
+YOLO identifies the food and where it is in the frame. The app then looks up its nutrition and assigned health rating. It does not weigh the food or calculate its nutrition from the image.
 
 ## How to run
 
@@ -66,7 +80,7 @@ In VS Code, choose **Python: Select Interpreter** from the command palette, sele
 | Save snapshot | Saves the whole app window as `screenshots/food_YYYY-MM-DD_HH-MM-SS.png`. |
 | Esc / close window | Stops the workers and closes the app. |
 
-The `screenshots` directory is created when saving. Allow the webcam to show a food before checking detection results.
+Hold one of the supported foods in view to try it. Saving a screenshot creates the `screenshots` folder automatically.
 
 ## How it works
 
@@ -136,14 +150,17 @@ These are approximate reference values, not measurements of the food in the imag
 
 ## What I learned
 
-- **Classification and detection solve different problems.** My first version used Teachable Machine and TensorFlow to classify an image. Moving to YOLO let me locate foods with boxes and handle multiple items in one frame.
-- **Model output needs application logic.** I connected model labels to consistent food names, filtered unsupported classes, and used confidence to choose the item shown in the panel.
-- **Inference should run separately from the interface.** Background camera processing, a lock-protected latest result, and queued speech let the window handle controls while detection continues.
-- **Confidence is not overall accuracy.** Labels can alternate under changing lighting or backgrounds. Retaining missed detections helps with brief gaps, but improving class stability also requires better data and evaluation.
-- **Performance needs measurement.** Timing the full processing cycle and averaging elapsed time across 300 frames gives a more useful throughput measurement than timing webcam capture alone.
-- **Recognition and nutrition are separate.** A food label can select reference data, but an image alone does not establish its weight or exact nutritional composition.
+I started with Teachable Machine and TensorFlow, which gave me a label for the image. Switching to YOLO changed what I could build: I could draw a box around the food and detect more than one item at a time. I used Roboflow to label bounding boxes and Google Colab to train the model, then loaded the saved weights in the desktop app.
 
-The training workflow used Roboflow for bounding-box labels and Google Colab for model training. The current application loads the trained weights rather than retraining at startup.
+Getting a prediction was only part of the work. I had to match the model's class names to my nutrition table, decide which food to show when several were visible, and handle frames where nothing was detected. For example, the fallback model calls an apple `apple`, while my table uses `Apples`. Small differences like that need to be handled before the result can appear correctly in the app.
+
+Testing with the webcam also showed me how unstable a prediction can be. I saw the label switch between apples and eggs even with fairly high confidence scores. Keeping the last detection for a few missed frames helps when a box briefly disappears, but it does not fix a wrong label. That made it clear why I need more varied training images and a separate test set before making claims about accuracy.
+
+I also learned how much happens outside the model. The camera, detection, window, and speech all need to work together. I used a camera worker so inference would not hold up the window, and a separate speech queue so reading a result would not pause detection. Clearing old announcements matters too, because the food on screen can change before the voice finishes speaking.
+
+To check speed, I added an FPS counter around capture and frame processing, including YOLO inference and drawing. I also calculate an average over 300 frames. This gives me a way to compare changes instead of judging performance only by how smooth the video looks.
+
+The nutrition panel taught me to be clear about what the app actually knows. Recognizing bread does not tell me its weight, recipe, or exact ingredients. The values shown are references for 100 g, and the health ratings are categories I assigned in the code. A useful next step is to improve and evaluate the detector while keeping those limits clear in the interface.
 
 ## Technology and files
 
@@ -169,7 +186,7 @@ computer-vision-food-health-checker/
 `-- screenshots/           # Created at runtime
 ```
 
-This is a local desktop application, with no React, Vite, Tailwind, web server, or cloud inference service.
+Detection runs locally in the Python desktop app.
 
 ## Troubleshooting
 
@@ -185,9 +202,9 @@ This is a local desktop application, with no React, Vite, Tailwind, web server, 
 
 ## Limitations and next steps
 
-The model supports five food categories and may misclassify unfamiliar appearances, occluded items, or cluttered scenes. Confidence is not a held-out accuracy result. The app does not estimate serving weight, retain a scan-history database, or assign persistent object IDs.
+The model is limited to five food categories. It can get confused by unfamiliar appearances, partly hidden foods, and cluttered backgrounds. I have not included a measured test-set accuracy here. The app also does not estimate portions, save a history of detections, or track individual objects between frames.
 
-Next steps include expanding the dataset, measuring precision and recall on held-out images, stabilizing class changes, adding camera and threshold controls, and testing installation on a clean machine.
+Next, I want to add more varied food photos and evaluate precision and recall on images kept out of training. I also want to reduce label switching, add camera and confidence controls to the window, and test the setup on another computer.
 
 ## License
 
