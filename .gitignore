@@ -6,3 +6,7 @@
 !fonts/
 !fonts/*
 !README.md
+!docs/
+!docs/images/
+!docs/images/bread-detection.png
+!docs/images/food-health-checker.png

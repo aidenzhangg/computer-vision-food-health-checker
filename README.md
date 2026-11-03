@@ -1,49 +1,42 @@
-# Computer Vision Food Health Checker
+# Computer Vision Food Recognition and Nutritional Analysis System
 
-A Python desktop app that recognizes food through a webcam, draws detection boxes, and displays a health rating with reference nutrition information. A custom YOLO model identifies eggs, chocolate, bread, pizza, and apples. The app also reads nutrition information aloud and saves annotated camera snapshots.
+A Python desktop application that uses a custom YOLO11 model and OpenCV to recognize food in a live webcam feed. It draws bounding boxes, shows confidence scores, and connects each recognized food to a reference nutrition table and a predefined health rating.
 
-Built with Ultralytics YOLO, OpenCV, CustomTkinter, and pyttsx3. Camera processing and speech run in background threads while the desktop window displays the latest detection result.
+I trained the detector on my own food photos. It supports **eggs, chocolate, bread, pizza, and apples**. The interface includes spoken feedback, nutrient bars, a live FPS counter, and screenshots of the app window.
 
-## Contents
+## Screenshots
 
-- [Features](#features)
-- [Installation](#installation)
-- [Using the app](#using-the-app)
-- [Detection pipeline](#detection-pipeline)
-- [Threading and display updates](#threading-and-display-updates)
-- [Configuration](#configuration)
-- [Nutrition data](#nutrition-data)
-- [Project structure](#project-structure)
-- [Technology](#technology)
-- [Troubleshooting](#troubleshooting)
-- [Limitations](#limitations)
-- [Project background](#project-background)
-- [Future improvements](#future-improvements)
-- [License](#license)
-- [Sources](#sources)
+![Food Health Checker detecting an egg, with its bounding box, confidence score, live FPS, and nutrition panel](docs/images/food-health-checker.png)
 
-## Features
+*Egg detection with spoken-feedback controls and a Nutrition Facts panel.*
 
-- Webcam detection with food names, confidence scores, and bounding boxes.
-- Multiple detections per frame; the most confident food supplies the side-panel information.
-- Colour-coded detection boxes for the predefined Healthy, Neutral, and Unhealthy ratings.
-- Energy and fat, carbohydrate, and protein values per 100 g.
-- Separate progress bars for recognition confidence and nutrient amounts.
-- Spoken nutrition information when the main detected food changes.
-- Voice mute controls and timestamped PNG snapshots.
-- Brief retention of previous detections when the model temporarily loses a food.
+![Food Health Checker detecting bread on a plate, with a neutral rating and nutrient bars](docs/images/bread-detection.png)
 
-## Installation
+*Bread detection showing a different food class and health rating. The confidence scores and FPS in these screenshots are individual observations, not overall accuracy or benchmark results.*
+
+## What it does
+
+- Detects supported foods through a webcam and draws colour-coded boxes with names and confidence scores.
+- Handles multiple detections; the most confident food is shown in the nutrition panel.
+- Displays calories, fat, carbohydrates, protein, and calculated daily-value percentages per 100 g.
+- Reads the detected food and its nutrition aloud through Windows text-to-speech.
+- Provides mute/unmute controls and saves a picture of the whole app window.
+- Displays current processing FPS and prints average throughput every 300 processed frames.
+
+The model predicts the food class and location. Nutrition values and Healthy, Neutral, or Unhealthy ratings are assigned through a lookup table; the camera does not measure them or estimate portion weight.
+
+## How to run
 
 ### Requirements
 
-- Python 3.11, a working webcam, and a desktop environment capable of opening a Tk window.
-- Windows is the primary development environment. Audio requires an installed system speech engine and a working playback device.
-- Internet access for dependency installation and for the first fallback-model download if `best.pt` is absent.
+- **Python 3.11** and **Windows** for the supported speech setup.
+- A webcam and a desktop session that can open a Tk window.
+- Speakers or headphones for audio feedback.
+- Internet access to install dependencies; the fallback model also downloads if needed.
 
-### Set up on Windows
+### Windows PowerShell
 
-Run these commands individually in PowerShell:
+Run each command on its own line:
 
 ```powershell
 git clone https://github.com/aidenzhangg/computer-vision-food-health-checker.git
@@ -51,116 +44,85 @@ cd computer-vision-food-health-checker
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m pip install pyttsx3
 .\.venv\Scripts\python.exe foodhealthchecker.py
 ```
 
-The current script imports `pyttsx3`, which is not listed in `requirements.txt`; the additional install command above is required. Ultralytics supplies dependencies including PyTorch, OpenCV (`cv2`), and NumPy. Installation can take several minutes.
+Keep `best.pt` and the `fonts` folder beside `foodhealthchecker.py`. The commands use the virtual environment directly, so activation is optional. Training images and notebooks are not needed to run the app.
 
-Keep `best.pt` beside `foodhealthchecker.py` to use the trained detector. No training notebooks or original training images are needed to run inference.
-
-These commands call the environment's Python directly, so PowerShell environment activation is optional. For an existing local `.venv-yolo` environment, run:
+If you already use the local `.venv-yolo` environment:
 
 ```powershell
 .\.venv-yolo\Scripts\python.exe foodhealthchecker.py
 ```
 
-### VS Code Run button
+In VS Code, choose **Python: Select Interpreter** from the command palette, select that environment's `python.exe`, then use **Run Python File in Terminal**.
 
-Open **Python: Select Interpreter** from the command palette and select the Python executable inside your environment, such as `.venv\Scripts\python.exe` or `.venv-yolo\Scripts\python.exe`. Open `foodhealthchecker.py` and choose **Run Python File in Terminal**.
+### Controls
 
-## Using the app
-
-Hold a supported food in view of the webcam. The image is mirrored for display. Each detected food receives a box and confidence label; the side panel follows the detection with the highest confidence.
-
-For example, an apple detected at 91% confidence displays `Apples`, a Healthy rating, 61 calories per 100 g, 0.15 g fat, 14.8 g carbohydrates, and 0.13 g protein. The confidence is illustrative, not a measured accuracy result.
-
-| Control | Behaviour |
+| Control | Action |
 |---|---|
-| Mute voice | Prevents new announcements and clears speech waiting in the queue. A sentence already playing may finish. |
-| Unmute voice | Enables announcements for subsequent changes in the main detected food. |
-| Save snapshot | Saves the latest annotated camera frame to `screenshots/food_YYYY-MM-DD_HH-MM-SS.png`. |
-| Esc / close window | Stops the camera worker, signals the speech worker, and closes the app. |
+| Mute voice | Clears pending announcements and interrupts current speech. |
+| Unmute voice | Enables speech and reads the current food if one is displayed. |
+| Save snapshot | Saves the whole app window as `screenshots/food_YYYY-MM-DD_HH-MM-SS.png`. |
+| Esc / close window | Stops the workers and closes the app. |
 
-Snapshots contain the camera image and detection overlays, not the surrounding app controls. The `screenshots` directory is created when the first image is saved.
+The `screenshots` directory is created when saving. Allow the webcam to show a food before checking detection results.
 
-## Detection pipeline
+## How it works
 
 ```text
-Webcam (OpenCV)
-    |
-    v
-Resize to 640 x 480 and mirror
-    |
-    v
-YOLO inference: supported classes, confidence >= 0.50
-    |
-    v
-Normalize food names and sort detections by confidence
-    |
-    +--> Retain previous detections during brief misses
-    |
-    +--> Nutrition lookup for the highest-confidence food
-    |        |
-    |        +--> Side panel
-    |        +--> Speech queue when the main food changes
-    |
-    v
-Draw boxes and labels --> Latest result --> CustomTkinter window
+Webcam capture
+    -> Resize to 640 x 480 and mirror
+    -> YOLO11 inference for supported food classes
+    -> Filter at 50% confidence and sort detections
+    -> Draw boxes and labels
+    -> Display the latest frame and nutrition lookup
+         + Queue speech when the main food changes
+         + Overlay FPS and report a 300-frame average
 ```
 
-### Model selection and class filtering
+### Model and labels
 
-The script resolves model paths relative to its own directory. If `best.pt` exists, it loads that file through `YOLO()`. Otherwise it uses `yolo11n.pt`, preferring a copy in the project directory and downloading the fallback if necessary.
+The app loads `best.pt` from the script directory. If it is missing, it falls back to `yolo11n.pt`; among the five foods in this project, the fallback supports only apples and pizza.
 
-`to_food_name()` normalizes model labels through `NAME_ALIASES`, such as `apple` to `Apples` and `egg` to `Eggs`. `FOOD_CLASS_IDS` limits inference to model classes that match the nutrition table. If no classes match, the script prints the model's class names and exits.
+`NAME_ALIASES` normalizes labels such as `apple` to `Apples`. `FOOD_CLASS_IDS` restricts inference to classes that match the nutrition table. `detect_foods()` returns each food's name, confidence, and `(x1, y1, x2, y2)` bounding box.
 
-The fallback model recognizes apples and pizza from this project's supported list. It does not replace the custom model for eggs, bread, or chocolate.
+### Threads and frame retention
 
-### Detection results and persistence
+`CameraWorker` captures and processes frames in a background thread. It stores the latest result behind a lock, and the main Tk thread checks for updates every 15 ms. A separate speech worker consumes a queue so announcements do not block inference or window controls.
 
-`detect_foods()` returns dictionaries containing `name`, `confidence`, and `box`, where the box is `(x1, y1, x2, y2)` in frame coordinates. Results are sorted by descending confidence.
+When no food is detected, previous detections remain visible for up to eight missed frames. This reduces brief disappearances, but does not track object IDs or smooth predictions that alternate between classes.
 
-`process_frame()` retains the previous detection list during up to eight consecutive frames without a supported detection. After that, the panel returns to its waiting state. This is frame retention rather than object tracking: objects have no persistent IDs, and retained boxes are not updated during missed frames.
+### FPS measurement
 
-The model identifies the food class. The health rating and nutrition values come from a separate lookup table; they are not predicted from the image.
+Timing uses `time.perf_counter()` before camera capture and after `process_frame()`. The displayed FPS includes capture, YOLO inference, nutrition lookup, and box drawing. Every 300 processed frames, the terminal prints:
 
-## Threading and display updates
+```text
+Average FPS over 300 processed frames: ...
+```
 
-| Component | Responsibility |
-|---|---|
-| Main Tk thread | Builds widgets, handles controls, and displays new results. |
-| `CameraWorker` | Captures webcam frames and runs detection and annotation sequentially. |
-| `_tts_worker` | Consumes queued announcements and calls the speech engine. |
-
-The camera worker publishes a single latest result protected by `threading.Lock`, with a frame counter identifying updates. The GUI checks for new results using `after(15, ...)` and skips frames it has already displayed. It does not build a queue of every processed camera frame.
-
-The side panel also caches a key containing the food name, rounded confidence, and other-food count to avoid unnecessary widget updates. Before a new speech message is queued, pending messages are cleared so older announcements do not accumulate. This does not interrupt speech already playing.
-
-The 15 ms GUI polling interval is not an inference-time or FPS guarantee. Actual speed depends on the model, CPU/GPU, webcam, and other running applications. This repository does not currently report benchmark results or validation accuracy metrics.
+Average FPS is `300 / total elapsed seconds`, including the FPS overlay and result publication. It measures camera-worker throughput, not GUI refresh rate or the duration of background speech playback. Performance varies with hardware, model, and scene; the first batch includes initial inference overhead.
 
 ## Configuration
 
-Settings are constants in `foodhealthchecker.py`; there is no settings file or command-line configuration interface.
+Edit these constants in `foodhealthchecker.py`:
 
-| Setting | Default | Effect |
+| Setting | Default | Purpose |
 |---|---|---|
-| `CONFIDENCE_THRESHOLD` | `0.50` | Filters lower-confidence detections. Raising it can reduce weak guesses but may miss foods. |
-| `HOLD_FRAMES` | `8` | Number of consecutive missed frames for which previous detections remain visible. |
-| `FRAME_W`, `FRAME_H` | `640`, `480` | Frame dimensions used before inference and for display. These are not an explicit YOLO `imgsz` setting. |
-| `MACRO_BAR_MAX` | `50.0` | Grams per 100 g that fill a nutrient bar completely. |
-| `CUSTOM_MODEL_PATH` | `best.pt` beside the script | Preferred trained model. |
-| `PRETRAINED_MODEL` | `yolo11n.pt` | Fallback model. |
-| `LOGO_PATH` | `logo.png` beside the script | Optional custom logo; a built-in logo is drawn if absent. |
-| `SCREENSHOT_DIR` | `screenshots` beside the script | Destination for saved frames. |
+| `CONFIDENCE_THRESHOLD` | `0.50` | Minimum confidence for accepted detections. |
+| `HOLD_FRAMES` | `8` | Number of missed frames that retain the previous detections. |
+| `FRAME_W`, `FRAME_H` | `640`, `480` | Frame dimensions before inference and for display. |
+| `DAILY_VALUES` | Fat: 78 g; carbs: 275 g; protein: 50 g | Reference amounts used for nutrient percentages and bars. |
+| `CUSTOM_MODEL_PATH` | `best.pt` | Preferred model beside the script. |
+| `SCREENSHOT_DIR` | `screenshots/` | Saved app-window images. |
 
-The camera index is set by `cv2.VideoCapture(0)` in `main()`. Change `0` to another index if the intended webcam is not the default device.
+The webcam is opened with `cv2.VideoCapture(0)` in `main()`. Try another index if the desired camera is not the default device.
 
 ## Nutrition data
 
-The following reference values are stored directly in the `food_categorization` Pandas DataFrame:
+Values are stored in the `food_categorization` Pandas DataFrame and expressed per 100 g:
 
-| Food | Assigned rating | Energy (kcal / 100 g) | Fat (g) | Carbohydrates (g) | Protein (g) |
+| Food | Assigned rating | Calories (kcal) | Fat (g) | Carbohydrates (g) | Protein (g) |
 |---|---|---:|---:|---:|---:|
 | Eggs | Healthy | 155 | 11.0 | 1.1 | 13.0 |
 | Chocolate | Unhealthy | 598 | 42.6 | 46.4 | 7.8 |
@@ -168,76 +130,64 @@ The following reference values are stored directly in the `food_categorization` 
 | Pizza | Unhealthy | 266 | 10.0 | 33.0 | 11.0 |
 | Apples | Healthy | 61 | 0.15 | 14.8 | 0.13 |
 
-Nutrient bar fill is calculated as `min(grams / 50.0, 1.0)`. These bars are not percentages of daily intake. Confidence bar fill uses the model's detection confidence directly.
+Daily-value percentages are calculated as `round(grams / reference_grams * 100)`. Nutrient bars use the same fraction, capped at a full bar. Small amounts can round to 0%.
 
-Values are approximate references for a fixed 100 g amount. The camera does not measure serving weight, ingredients, or preparation method. Ratings are manually assigned categories in this prototype, not individualized dietary assessments.
+These are approximate reference values, not measurements of the food in the image. Recipes, brands, and preparation methods vary. Health ratings are simplified categories in this prototype.
 
-## Project structure
+## What I learned
 
-```text
-computer-vision-food-health-checker/
-|-- foodhealthchecker.py   # Detection, nutrition table, speech, and desktop UI
-|-- best.pt                # Custom trained YOLO weights
-|-- fonts/                 # Barlow fonts and OFL.txt
-|-- requirements.txt       # Dependency list
-|-- README.md
-|-- logo.png               # Optional; user-supplied
-`-- screenshots/           # Created at runtime when saving an image
-```
+- **Classification and detection solve different problems.** My first version used Teachable Machine and TensorFlow to classify an image. Moving to YOLO let me locate foods with boxes and handle multiple items in one frame.
+- **Model output needs application logic.** I connected model labels to consistent food names, filtered unsupported classes, and used confidence to choose the item shown in the panel.
+- **Inference should run separately from the interface.** Background camera processing, a lock-protected latest result, and queued speech let the window handle controls while detection continues.
+- **Confidence is not overall accuracy.** Labels can alternate under changing lighting or backgrounds. Retaining missed detections helps with brief gaps, but improving class stability also requires better data and evaluation.
+- **Performance needs measurement.** Timing the full processing cycle and averaging elapsed time across 300 frames gives a more useful throughput measurement than timing webcam capture alone.
+- **Recognition and nutrition are separate.** A food label can select reference data, but an image alone does not establish its weight or exact nutritional composition.
 
-The current window loads Barlow font files and uses Georgia for display headings. The older Teachable Machine implementation may be present in local development files, but it is not needed to run this app.
+The training workflow used Roboflow for bounding-box labels and Google Colab for model training. The current application loads the trained weights rather than retraining at startup.
 
-## Technology
+## Technology and files
 
 | Technology | Role |
 |---|---|
 | Python 3.11 | Application code |
-| Ultralytics YOLO / PyTorch | Model loading and object detection |
-| OpenCV | Camera capture, resizing, mirroring, overlays, and PNG output |
+| Ultralytics YOLO11 / PyTorch | Object detection |
+| OpenCV | Webcam capture, preprocessing, and FPS overlay |
 | CustomTkinter | Desktop window and controls |
-| Pillow | Logo drawing and conversion of camera images for Tk |
-| NumPy | Image arrays and numerical operations |
-| Pandas | Nutrition lookup table |
-| pyttsx3 | Text-to-speech using an installed system speech engine |
-| `threading` / `queue` | Background inference, synchronization, and speech messages |
+| Pillow | Detection-label rendering, logos, and app-window snapshots |
+| Pandas / NumPy | Reference data and image arrays |
+| pywin32 / Windows SAPI | Spoken feedback and interruption |
+| `threading` / `queue` | Camera and speech workers |
 
-The training workflow used food photos labelled with Roboflow and model training in Google Colab. The runtime loads the resulting weights; it does not retrain the model.
+```text
+computer-vision-food-health-checker/
+|-- foodhealthchecker.py
+|-- best.pt
+|-- fonts/                 # Barlow fonts and OFL.txt
+|-- docs/images/           # README screenshots
+|-- requirements.txt
+|-- README.md
+`-- screenshots/           # Created at runtime
+```
+
+This is a local desktop application, with no React, Vite, Tailwind, web server, or cloud inference service.
 
 ## Troubleshooting
 
-| Symptom | What to check |
+| Issue | Check |
 |---|---|
-| `No module named customtkinter`, `cv2`, or `pyttsx3` | Install dependencies with the same environment's `python.exe` used to launch the app. Install `pyttsx3` separately as shown above. |
-| VS Code Run fails while the terminal command works | Select the project environment through **Python: Select Interpreter**. |
-| Webcam does not open | Close other camera apps, check Windows camera permissions, and try another `VideoCapture` index. |
-| Only apples and pizza are supported | Check that `best.pt` is beside the script and read the model-selection message in the terminal. |
-| No model classes match | Compare `model.names` with `NAME_ALIASES` and the nutrition table. |
-| Labels alternate between foods | Try clearer lighting, a less cluttered background, or a higher confidence threshold. Frame retention does not smooth conflicting class predictions. |
-| Voice is silent | Ensure voice is unmuted, verify the playback device and system speech engine, and check the terminal for `TTS error`. A food must change from the last announced class to trigger another announcement. |
-| UI is responsive but video updates slowly | Inference runs separately from the GUI; inspect hardware load and model size. No fixed FPS is promised. |
-| Snapshot says there is no camera image | Wait for the first processed frame before saving. |
+| Missing Python module | Install `requirements.txt` with the same environment's Python used to run the script. |
+| VS Code uses the wrong environment | Choose **Python: Select Interpreter** and select the project's environment. |
+| Webcam does not open | Close other camera apps, check Windows camera access, and try another camera index. |
+| Only apples and pizza are detected | Check that `best.pt` is beside the script and inspect the startup model message. |
+| Speech is silent | Unmute voice, check the playback device, and look for `TTS error` in the terminal. |
+| Food labels flicker | Improve lighting and the background, or increase the confidence threshold. |
+| Video updates slowly | Check hardware load and the 300-frame FPS average. The GUI polling interval is not an inference speed guarantee. |
 
-## Limitations
+## Limitations and next steps
 
-Recognition is limited to supported classes in the loaded model. Confidence scores are model outputs, not a measured overall accuracy percentage. Similar appearances, occlusion, lighting, and backgrounds can cause misclassification, and the main panel may switch when detections trade confidence rankings.
+The model supports five food categories and may misclassify unfamiliar appearances, occluded items, or cluttered scenes. Confidence is not a held-out accuracy result. The app does not estimate serving weight, retain a scan-history database, or assign persistent object IDs.
 
-All inference and nutrition lookup run locally. There is no web server, browser frontend, detection database, persistent tracking, or scan-history feature in the current app. Camera images are saved only when the snapshot control is used. The app requires a desktop session and has not been packaged as a standalone executable.
-
-## Project background
-
-I built this project to explore how computer vision can recognize everyday foods and make basic food information easier to access through a visual panel and spoken feedback.
-
-The first version used Google Teachable Machine and TensorFlow for image classification. The current version uses YOLO object detection, allowing the app to locate foods and identify multiple items in one frame. Nutrition remains supporting information attached to each recognized class.
-
-## Future improvements
-
-- Expand the labelled dataset and supported food categories.
-- Evaluate class-level precision, recall, and confusion on a held-out dataset.
-- Stabilize changes in the main detected class across successive frames.
-- Improve speech reliability and immediate interruption when muted.
-- Move reference food data into a separate file with more specific source records.
-- Add camera selection and configurable thresholds in the window.
-- Package and test installation on a clean machine.
+Next steps include expanding the dataset, measuring precision and recall on held-out images, stabilizing class changes, adding camera and threshold controls, and testing installation on a clean machine.
 
 ## License
 
