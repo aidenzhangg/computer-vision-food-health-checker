@@ -1,7 +1,5 @@
 # Computer Vision Food Recognition and Nutritional Analysis System
 
-**Hold food up to a webcam, see what the model recognizes, and get its reference nutrition information without typing a search.**
-
 ## Why I built this
 
 I'm interested in nutrition, but keeping track of food is another task to fit around school and everything else. Apps like MyFitnessPal came to mind when I thought about food logging: searching for an item, choosing the right entry, and entering a portion. I wanted to explore whether a camera could make the food lookup step easier.
