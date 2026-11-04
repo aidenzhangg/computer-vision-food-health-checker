@@ -82,16 +82,31 @@ Hold one of the supported foods in view to try it. Saving a screenshot creates t
 
 ## How it works
 
-```text
-Webcam capture
-    -> Resize to 640 x 480 and mirror
-    -> YOLO11 inference for supported food classes
-    -> Filter at 50% confidence and sort detections
-    -> Draw boxes and labels
-    -> Display the latest frame and nutrition lookup
-         + Queue speech when the main food changes
-         + Overlay FPS and report a 300-frame average
-```
+![Diagram of the three threads in foodhealthchecker.py: the camera thread captures, preprocesses, detects, holds, draws and publishes each frame; the main Tk thread polls for the newest result, shows the frame and fills the nutrition label; the speech queue and worker read the result aloud](docs/images/how-it-works.svg)
+
+The app runs on three threads. The camera thread does the heavy work, the main Tk thread only draws the window, and the speech thread talks. They pass data in two places: a locked "latest result" slot inside `CameraWorker`, and the `_speech_q` queue.
+
+**Camera thread: `CameraWorker.run()`, steps 1 to 6**
+
+1. **Capture.** `camera.read()` returns a BGR NumPy frame from `cv2.VideoCapture(0)`.
+2. **Preprocess.** `process_frame()` resizes the frame to 640 × 480 and mirrors it with `cv2.flip(frame, 1)`. YOLO runs on this mirrored frame, so the boxes line up with what the window shows.
+3. **Detect.** `detect_foods()` calls the model with `conf=CONFIDENCE_THRESHOLD` and `classes=FOOD_CLASS_IDS`, so only the five foods in the nutrition table come back, and only above 50% confidence. Each box becomes `{name, confidence, box}`. `to_food_name()` maps the model's label to the table's name, and the list is sorted from most to least confident.
+4. **Hold.** If YOLO finds nothing, `state["missed"]` counts up and the previous detections stay on screen until it passes `HOLD_FRAMES` (8). The most confident detection becomes `main`. If `main` is a different food from `state["last_spoken"]`, step 11 runs.
+5. **Draw.** `draw_detections()` draws each box in its food's health colour. The main food gets a thicker box, drawn last so it sits on top.
+6. **Publish.** The FPS is stamped on the frame. Then `(frame, main, other_count)` is stored in `_latest` under `self._lock`, and `_frame_id` goes up by one.
+
+**Main Tk thread: `update_loop()`, steps 7 to 10**
+
+7. **Poll.** Every 15 ms, `get_latest()` reads `_frame_id` and `_latest` under the same lock. If the id hasn't changed, nothing is redrawn. The window only ever takes the newest result, so a slow frame never builds up a backlog.
+8. **Show the frame.** The frame is converted from BGR to RGB and shown as a 640 × 480 `CTkImage`.
+9. **Look up nutrition.** `show_food()` passes `main["name"]` to `get_nutrition_info()`, which reads that food's row from the `food_categorization` DataFrame.
+10. **Fill the label.** Daily-value percentages are `round(grams / DAILY_VALUES[key] * 100)`. The badge takes its colour from `HEALTH_HEX`, and the confidence bar is set from `main["confidence"]`. The panel is only rebuilt when the food, its rounded confidence, or the number of other foods changes.
+
+**Speech: `_speech_q` and `_tts_worker()`, steps 11 to 13**
+
+11. **Queue.** On the camera thread, `speak_nutrition()` builds one sentence, empties anything still waiting with `_clear_speech_queue()`, and puts the new sentence on `_speech_q`. Only the newest food is ever waiting to be read.
+12. **Speak.** `_tts_worker()` takes the sentence off the queue and passes it to Windows SAPI with `SPEAK_ASYNC`, checking every 50 ms whether it has been told to stop. It runs on its own thread, so speaking never pauses detection.
+13. **Mute.** On the main thread, `toggle_mute()` calls `stop_speech()`, which empties the queue and sets `_stop_speaking`. The worker then calls `Speak("", SPEAK_ASYNC | PURGE)` to cut off the sentence in progress.
 
 ### Model and labels
 

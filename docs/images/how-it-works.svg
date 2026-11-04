@@ -1,0 +1,212 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <style>
+    .t{font-size:26px;font-weight:700;fill:#000}
+    .st{font-size:14px;fill:#4A4F45}
+    .lane{fill:#fff;stroke:#000;stroke-width:1.5}
+    .lh{font-size:13.5px;font-weight:700;letter-spacing:.4px}
+    .lr{font-size:12.5px}
+    .box{fill:#fff;stroke:#000;stroke-width:1.5}
+    .bt{font-size:14px;font-weight:700;fill:#000}
+    .c{font-family:Consolas,Menlo,'DejaVu Sans Mono',monospace;font-size:11px;fill:#1b1b1b;white-space:pre}
+    .n{font-size:12px;fill:#4A4F45}
+    .o{font-size:12px;font-weight:600;fill:#1E7B3C}
+    .rule{stroke:#000;stroke-width:1}
+    .ar{stroke:#000;stroke-width:1.6;fill:none}
+    .gl{font-size:12.5px;fill:#000;text-anchor:middle}
+    .num{font-size:11px;font-weight:700;text-anchor:middle}
+    .ft{font-size:12px;fill:#4A4F45}
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#000"/></marker>
+  </defs>
+
+  <rect width="1200" height="900" fill="#DCE3D2"/>
+  <text class="t" x="24" y="44">From webcam frame to nutrition panel</text>
+  <text class="st" x="24" y="68">The three threads in foodhealthchecker.py, the function behind each step, and what it hands to the next step</text>
+
+  <!-- ===== Main Tk thread ===== -->
+  <rect class="lane" x="10" y="90" width="1180" height="200"/>
+  <rect x="10" y="90" width="1180" height="26" fill="#E0A100" stroke="#000" stroke-width="1.5"/>
+  <text class="lh" x="22" y="108" fill="#000">MAIN TK THREAD · update_loop() in the CustomTkinter window</text>
+  <text class="lr" x="1178" y="108" fill="#000" text-anchor="end">re-runs itself every 15 ms</text>
+
+  <g>
+    <rect class="box" x="20" y="128" width="272" height="150"/>
+    <circle cx="40" cy="150" r="10" fill="#E0A100" stroke="#000"/><text class="num" x="40" y="154" fill="#000">7</text>
+    <text class="bt" x="58" y="155">Poll for a new frame</text>
+    <text class="c" x="32" y="180">self.after(15, update_loop)</text>
+    <text class="c" x="32" y="198">frame_id, latest = get_latest()</text>
+    <text class="n" x="32" y="216">skip if frame_id has not changed</text>
+    <line class="rule" x1="32" y1="236" x2="280" y2="236"/>
+    <text class="o" x="32" y="258">→ (frame, main, other_count)</text>
+  </g>
+  <g>
+    <rect class="box" x="316" y="128" width="272" height="150"/>
+    <circle cx="336" cy="150" r="10" fill="#E0A100" stroke="#000"/><text class="num" x="336" y="154" fill="#000">8</text>
+    <text class="bt" x="354" y="155">Show the frame</text>
+    <text class="c" x="328" y="180">cv2.cvtColor(..., COLOR_BGR2RGB)</text>
+    <text class="c" x="328" y="198">CTkImage(..., size=(640, 480))</text>
+    <text class="c" x="328" y="216">video_label.configure(image=...)</text>
+    <line class="rule" x1="328" y1="236" x2="576" y2="236"/>
+    <text class="o" x="328" y="258">→ live video in the window</text>
+  </g>
+  <g>
+    <rect class="box" x="612" y="128" width="272" height="150"/>
+    <circle cx="632" cy="150" r="10" fill="#E0A100" stroke="#000"/><text class="num" x="632" y="154" fill="#000">9</text>
+    <text class="bt" x="650" y="155">Look up nutrition</text>
+    <text class="c" x="624" y="180">show_food(main, other_count)</text>
+    <text class="c" x="624" y="198">get_nutrition_info(</text>
+    <text class="c" x="624" y="216">  food_categorization, name)</text>
+    <line class="rule" x1="624" y1="236" x2="872" y2="236"/>
+    <text class="o" x="624" y="258">→ kcal, fat, carbs, protein, rating</text>
+  </g>
+  <g>
+    <rect class="box" x="908" y="128" width="272" height="150"/>
+    <circle cx="928" cy="150" r="10" fill="#E0A100" stroke="#000"/><text class="num" x="928" y="154" fill="#000">10</text>
+    <text class="bt" x="946" y="155">Fill the nutrition label</text>
+    <text class="c" x="920" y="180">%DV = round(g / DAILY_VALUES * 100)</text>
+    <text class="c" x="920" y="198">badge colour = HEALTH_HEX[rating]</text>
+    <text class="c" x="920" y="216">conf_bar.set(confidence)</text>
+    <line class="rule" x1="920" y1="236" x2="1168" y2="236"/>
+    <text class="o" x="920" y="258">→ redrawn only when the result changes</text>
+  </g>
+  <path class="ar" d="M294 203H314" marker-end="url(#a)"/>
+  <path class="ar" d="M590 203H610" marker-end="url(#a)"/>
+  <path class="ar" d="M886 203H906" marker-end="url(#a)"/>
+
+  <!-- handoff: camera thread -> main thread -->
+  <path class="ar" d="M1090 378V315H156V280" marker-end="url(#a)"/>
+  <text class="gl" x="623" y="307">6 → 7: result shared under self._lock. The window always reads the newest result, so it never falls behind the camera</text>
+
+  <!-- ===== Camera thread ===== -->
+  <rect class="lane" x="10" y="340" width="1180" height="260"/>
+  <rect x="10" y="340" width="1180" height="26" fill="#1E7B3C" stroke="#000" stroke-width="1.5"/>
+  <text class="lh" x="22" y="358" fill="#fff">CAMERA THREAD · CameraWorker.run() loop</text>
+  <text class="lr" x="1178" y="358" fill="#fff" text-anchor="end">FPS = 1 / seconds per frame · average printed every 300 frames</text>
+
+  <g>
+    <rect class="box" x="24" y="378" width="172" height="212"/>
+    <circle cx="44" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="44" y="404" fill="#fff">1</text>
+    <text class="bt" x="62" y="405">Capture</text>
+    <text class="c" x="34" y="430">ret, frame =</text>
+    <text class="c" x="34" y="447">  camera.read()</text>
+    <text class="n" x="34" y="464">from VideoCapture(0)</text>
+    <line class="rule" x1="34" y1="540" x2="186" y2="540"/>
+    <text class="o" x="34" y="560">→ BGR frame</text>
+    <text class="o" x="34" y="576">  (numpy array)</text>
+  </g>
+  <g>
+    <rect class="box" x="220" y="378" width="172" height="212"/>
+    <circle cx="240" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="240" y="404" fill="#fff">2</text>
+    <text class="bt" x="258" y="405">Preprocess</text>
+    <text class="c" x="230" y="430">process_frame()</text>
+    <text class="c" x="230" y="447">cv2.resize(frame,</text>
+    <text class="c" x="230" y="464">  (640, 480))</text>
+    <text class="c" x="230" y="481">cv2.flip(frame, 1)</text>
+    <line class="rule" x1="230" y1="540" x2="382" y2="540"/>
+    <text class="o" x="230" y="560">→ mirrored</text>
+    <text class="o" x="230" y="576">  640 × 480 frame</text>
+  </g>
+  <g>
+    <rect class="box" x="416" y="378" width="172" height="212"/>
+    <circle cx="436" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="436" y="404" fill="#fff">3</text>
+    <text class="bt" x="454" y="405">Detect</text>
+    <text class="c" x="426" y="430">detect_foods(frame)</text>
+    <text class="c" x="426" y="447">model(frame,</text>
+    <text class="c" x="426" y="464">  conf=0.50,</text>
+    <text class="c" x="426" y="481">  classes=</text>
+    <text class="c" x="426" y="498">  FOOD_CLASS_IDS)</text>
+    <text class="n" x="426" y="516">YOLO11 weights: best.pt</text>
+    <line class="rule" x1="426" y1="540" x2="578" y2="540"/>
+    <text class="o" x="426" y="560">→ [{name, confidence,</text>
+    <text class="o" x="426" y="576">  box}], sorted</text>
+  </g>
+  <g>
+    <rect class="box" x="612" y="378" width="172" height="212"/>
+    <circle cx="632" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="632" y="404" fill="#fff">4</text>
+    <text class="bt" x="650" y="405">Hold</text>
+    <text class="c" x="622" y="430">if not detections:</text>
+    <text class="c" x="622" y="447">  state['missed'] += 1</text>
+    <text class="n" x="622" y="464">keep the last boxes until</text>
+    <text class="c" x="622" y="481">missed > HOLD_FRAMES</text>
+    <text class="n" x="622" y="498">(8 frames)</text>
+    <line class="rule" x1="622" y1="540" x2="774" y2="540"/>
+    <text class="o" x="622" y="560">→ main =</text>
+    <text class="o" x="622" y="576">  detections[0]</text>
+  </g>
+  <g>
+    <rect class="box" x="808" y="378" width="172" height="212"/>
+    <circle cx="828" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="828" y="404" fill="#fff">5</text>
+    <text class="bt" x="846" y="405">Draw</text>
+    <text class="c" x="818" y="430">draw_detections(</text>
+    <text class="c" x="818" y="447">  frame, detections)</text>
+    <text class="n" x="818" y="464">box colour = health</text>
+    <text class="n" x="818" y="481">rating of that food</text>
+    <text class="n" x="818" y="498">main food: thicker box</text>
+    <line class="rule" x1="818" y1="540" x2="970" y2="540"/>
+    <text class="o" x="818" y="560">→ annotated frame</text>
+  </g>
+  <g>
+    <rect class="box" x="1004" y="378" width="172" height="212"/>
+    <circle cx="1024" cy="400" r="10" fill="#1E7B3C" stroke="#000"/><text class="num" x="1024" y="404" fill="#fff">6</text>
+    <text class="bt" x="1042" y="405">Publish</text>
+    <text class="c" x="1014" y="430">cv2.putText(FPS)</text>
+    <text class="c" x="1014" y="447">with self._lock:</text>
+    <text class="c" x="1014" y="464">  _latest = (frame,</text>
+    <text class="c" x="1014" y="481">    main, other_count)</text>
+    <text class="c" x="1014" y="498">  _frame_id += 1</text>
+    <line class="rule" x1="1014" y1="540" x2="1166" y2="540"/>
+    <text class="o" x="1014" y="560">→ newest result</text>
+    <text class="o" x="1014" y="576">  + new frame_id</text>
+  </g>
+  <path class="ar" d="M198 484H218" marker-end="url(#a)"/>
+  <path class="ar" d="M394 484H414" marker-end="url(#a)"/>
+  <path class="ar" d="M590 484H610" marker-end="url(#a)"/>
+  <path class="ar" d="M786 484H806" marker-end="url(#a)"/>
+  <path class="ar" d="M982 484H1002" marker-end="url(#a)"/>
+
+  <!-- handoff: camera thread -> speech -->
+  <path class="ar" d="M698 590V625H200V684" marker-end="url(#a)"/>
+  <text class="gl" x="449" y="644">4 → 11: main food changed, so one sentence is queued</text>
+
+  <!-- ===== Speech ===== -->
+  <rect class="lane" x="10" y="650" width="1180" height="200"/>
+  <rect x="10" y="650" width="1180" height="26" fill="#C62F1D" stroke="#000" stroke-width="1.5"/>
+  <text class="lh" x="22" y="668" fill="#fff">SPEECH · _speech_q queue + _tts_worker() thread</text>
+  <text class="lr" x="1178" y="668" fill="#fff" text-anchor="end">Windows SAPI voice through pywin32</text>
+
+  <g>
+    <rect class="box" x="20" y="686" width="360" height="148"/>
+    <circle cx="40" cy="708" r="10" fill="#C62F1D" stroke="#000"/><text class="num" x="40" y="712" fill="#fff">11</text>
+    <text class="bt" x="58" y="713">Queue the sentence (camera thread)</text>
+    <text class="c" x="32" y="738">if main['name'] != state['last_spoken']:</text>
+    <text class="c" x="32" y="756">  speak_nutrition(name, info)</text>
+    <text class="c" x="32" y="774">_clear_speech_queue(); _speech_q.put(text)</text>
+    <line class="rule" x1="32" y1="792" x2="368" y2="792"/>
+    <text class="o" x="32" y="814">→ only the newest sentence is waiting</text>
+  </g>
+  <g>
+    <rect class="box" x="420" y="686" width="360" height="148"/>
+    <circle cx="440" cy="708" r="10" fill="#C62F1D" stroke="#000"/><text class="num" x="440" y="712" fill="#fff">12</text>
+    <text class="bt" x="458" y="713">Speak in the background</text>
+    <text class="c" x="432" y="738">text = _speech_q.get()</text>
+    <text class="c" x="432" y="756">voice.Speak(text, SPEAK_ASYNC)</text>
+    <text class="c" x="432" y="774">while not voice.WaitUntilDone(50): ...</text>
+    <line class="rule" x1="432" y1="792" x2="768" y2="792"/>
+    <text class="o" x="432" y="814">→ detection never waits for speech</text>
+  </g>
+  <g>
+    <rect class="box" x="820" y="686" width="360" height="148"/>
+    <circle cx="840" cy="708" r="10" fill="#C62F1D" stroke="#000"/><text class="num" x="840" y="712" fill="#fff">13</text>
+    <text class="bt" x="858" y="713">Mute button (main thread)</text>
+    <text class="c" x="832" y="738">toggle_mute() → stop_speech()</text>
+    <text class="c" x="832" y="756">_clear_speech_queue(); _stop_speaking.set()</text>
+    <text class="c" x="832" y="774">voice.Speak('', SPEAK_ASYNC | PURGE)</text>
+    <line class="rule" x1="832" y1="792" x2="1168" y2="792"/>
+    <text class="o" x="832" y="814">→ cuts off the sentence being spoken</text>
+  </g>
+  <path class="ar" d="M382 760H418" marker-end="url(#a)"/>
+  <path class="ar" d="M818 760H782" marker-end="url(#a)"/>
+
+  <text class="ft" x="24" y="878">Constants from foodhealthchecker.py: CONFIDENCE_THRESHOLD = 0.50 · HOLD_FRAMES = 8 · FRAME_W × FRAME_H = 640 × 480 · DAILY_VALUES: fat 78 g, carbs 275 g, protein 50 g</text>
+</svg>
