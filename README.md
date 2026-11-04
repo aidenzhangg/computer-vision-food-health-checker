@@ -8,7 +8,6 @@ What if I could just hold food up to a camera instead of typing its name? That q
 
 I started with a simple image classifier, then moved to YOLO11 so I could draw boxes around foods and detect more than one item at once. This project is my first version of that idea: scan a supported food, see the result, and hear its nutrition read aloud.
 
-There is still a gap between recognizing a food and logging a meal. The app currently shows reference values per 100 g; it does not know how much I am eating or keep a food diary. Making food easier to look up is the part I have built so far.
 
 ## About
 
